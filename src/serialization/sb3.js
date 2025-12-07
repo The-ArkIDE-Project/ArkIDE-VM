@@ -930,7 +930,7 @@ const serialize = function (runtime, targetId, {allowOptimization = true} = {}) 
     // Attach platform information so TurboWarp and other mods can detect where the file comes from
     const platform = Object.create(null);
     platform.name = "PenguinMod";
-    platform.url = "https://penguinmod.com/";
+    platform.url = "https://arkide.site/";
     platform.version = "stable";
     meta.platform = platform;
 

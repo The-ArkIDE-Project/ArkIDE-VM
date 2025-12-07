@@ -81,7 +81,7 @@ class JgRuntimeBlocks {
                     arguments: {
                         URL: {
                             type: ArgumentType.STRING,
-                            defaultValue: `https://corsproxy.io/?${encodeURIComponent('https://penguinmod.com/navicon.png')}`
+                            defaultValue: `https://corsproxy.io/?${encodeURIComponent('https://arkide.site/navicon.png')}`
                         },
                         name: {
                             type: ArgumentType.STRING,
