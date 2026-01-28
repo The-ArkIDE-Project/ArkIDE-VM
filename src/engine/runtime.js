@@ -264,6 +264,8 @@ class Runtime extends EventEmitter {
          */
         this.executableTargets = [];
 
+        this.targetIdMap = new Map();
+
         /**
          * A list of threads that are currently running in the VM.
          * Threads are added when execution starts and pruned when execution ends.
@@ -272,6 +274,9 @@ class Runtime extends EventEmitter {
         this.threads = [];
 
         this.threadMap = new Map();
+        this._scriptCache = new Map();
+
+        this.killedThreads = new Set();
 
         /** @type {!Sequencer} */
         this.sequencer = new Sequencer(this);
@@ -1216,7 +1221,13 @@ class Runtime extends EventEmitter {
 
     // -----------------------------------------------------------------------------
     // -----------------------------------------------------------------------------
-
+    getCachedScripts (blocks, opcode) {
+    const key = `${blocks._cacheKey || 'unknown'}_${opcode}`;
+    if (!this._scriptCache.has(key)) {
+        this._scriptCache.set(key, BlocksRuntimeCache.getScripts(blocks, opcode));
+    }
+    return this._scriptCache.get(key);
+}
     // Helper function for initializing the addCloudVariable function
     _initializeAddCloudVariable (newCloudDataManager) {
         // The addCloudVariable function
@@ -2509,9 +2520,8 @@ class Runtime extends EventEmitter {
      * @param {!Thread} thread Thread object to remove from actives
      */
     _stopThread (thread) {
-        // Mark the thread for later removal
         thread.isKilled = true;
-        // Inform sequencer to stop executing that thread.
+        this.killedThreads.add(thread); // ADD THIS LINE
         this.sequencer.retireThread(thread);
     }
 
@@ -2656,7 +2666,7 @@ class Runtime extends EventEmitter {
         }
         for (let t = targets.length - 1; t >= 0; t--) {
             const target = targets[t];
-            const scripts = BlocksRuntimeCache.getScripts(target.blocks, opcode);
+            const scripts = this.getCachedScripts(target.blocks, opcode); // CHANGE THIS LINE
             for (let j = 0; j < scripts.length; j++) {
                 f(scripts[j], target);
             }
@@ -2767,6 +2777,8 @@ class Runtime extends EventEmitter {
         });
 
         this.targets.map(this.disposeTarget, this);
+            this.targetIdMap.clear(); // ADD THIS LINE
+    this._scriptCache.clear(); // ADD THIS LINE
         // tw: explicitly emit a MONITORS_UPDATE instead of relying on implicit behavior of _step()
         const emptyMonitorState = OrderedMap({});
         if (!emptyMonitorState.equals(this._monitorState)) {
@@ -2819,6 +2831,7 @@ class Runtime extends EventEmitter {
             }
         }
         this.targets.push(target);
+        this.targetIdMap.set(target.id, target);
         this.executableTargets.push(target);
         if (target.isStage && !this._stageTarget) {
             this._stageTarget = target;
@@ -2886,9 +2899,8 @@ class Runtime extends EventEmitter {
     disposeTarget (disposingTarget) {
         this.targets = this.targets.filter(target => {
             if (disposingTarget !== target) return true;
-            // Allow target to do dispose actions.
             target.dispose();
-            // Remove from list of targets.
+            this.targetIdMap.delete(target.id); // ADD THIS LINE
             return false;
         });
         if (this._stageTarget === disposingTarget) {
@@ -3039,7 +3051,9 @@ class Runtime extends EventEmitter {
         // pm: RUNTIME_STEP_START runs before BEFORE_EXECUTE
         // this runs before any processing of this new step
         this.frameLoop._stepCounter++;
+    if (this.listenerCount(Runtime.RUNTIME_STEP_START) > 0) {
         this.emit(Runtime.RUNTIME_STEP_START);
+    }
 
         if (this.interpolationEnabled) {
             interpolate.setupInitialState(this);
@@ -3053,7 +3067,17 @@ class Runtime extends EventEmitter {
         }
 
         // Clean up threads that were told to stop during or since the last step
-        this.threads = this.threads.filter(thread => !thread.isKilled);
+        if (this.killedThreads.size > 0) {
+            let writeIndex = 0;
+            for (let readIndex = 0; readIndex < this.threads.length; readIndex++) {
+                if (!this.killedThreads.has(this.threads[readIndex])) {
+                    this.threads[writeIndex++] = this.threads[readIndex];
+                }
+            }
+            this.threads.length = writeIndex;
+            this.killedThreads.clear();
+        }
+        
         this.updateThreadMap();
 
         // Find all edge-activated hats, and add them to threads to be evaluated.
@@ -3140,7 +3164,9 @@ class Runtime extends EventEmitter {
         }
 
         // pm: RUNTIME_STEP_END runs after AFTER_EXECUTE
-        this.emit(Runtime.RUNTIME_STEP_END);
+        if (this.listenerCount(Runtime.RUNTIME_STEP_END) > 0) {
+            this.emit(Runtime.RUNTIME_STEP_END);
+        }
     }
 
     /**
@@ -3310,6 +3336,7 @@ class Runtime extends EventEmitter {
         }
         this.flyoutBlocks.resetCache();
         this.monitorBlocks.resetCache();
+        this._scriptCache.clear(); // ADD THIS LINE
     }
 
     /**
@@ -3716,12 +3743,7 @@ class Runtime extends EventEmitter {
      * @return {?Target} The target, if found.
      */
     getTargetById (targetId) {
-        for (let i = 0; i < this.targets.length; i++) {
-            const target = this.targets[i];
-            if (target.id === targetId) {
-                return target;
-            }
-        }
+        return this.targetIdMap.get(targetId); // REPLACE entire function with this
     }
 
     /**
