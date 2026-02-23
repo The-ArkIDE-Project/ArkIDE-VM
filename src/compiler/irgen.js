@@ -2561,6 +2561,10 @@ class IRGenerator {
             this.proceduresToCompile = new Map();
 
             for (const [procedureVariant, definitionId] of this.compilingProcedures.entries()) {
+                if (!definitionId) {
+                    log.warn(`IR: skipping procedure with no definition: ${procedureVariant}`);
+                    continue;
+                }
                 if (procedureTreeCache[procedureVariant]) {
                     const result = procedureTreeCache[procedureVariant];
                     this.procedures[procedureVariant] = result;
