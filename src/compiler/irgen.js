@@ -2429,10 +2429,9 @@ class ScriptTreeGenerator {
                 // Empty procedure
                 return this.script;
             }
-            // Instead of throwing, return an empty script so the thread
-            // gets silently dropped rather than spamming errors
-            log.warn(`IR: Cannot find top block "${topBlockId}" on target "${this.target.getName()}", skipping`);
-            return this.script;
+            // TEMPORARY DEBUG - tells us exactly what's orphaned
+            log.warn(`IR: Cannot find top block. ID="${topBlockId}" target="${this.target.getName()}" scripts=`, JSON.stringify(this.blocks._scripts));
+            throw new Error('Cannot find top block');
         }
 
         if (topBlock.comment) {
@@ -2554,22 +2553,6 @@ class IRGenerator {
      * @returns {IntermediateRepresentation} Intermediate representation.
      */
     generate () {
-        if (!this.thread.topBlock) {
-            const ir = new IntermediateRepresentation();
-            ir.entry = new IntermediateScript();
-            ir.procedures = {};
-            return ir;
-        }
-
-        const topBlockCheck = this.blocks.getBlock(this.thread.topBlock) || 
-                            this.blocks.runtime.flyoutBlocks.getBlock(this.thread.topBlock);
-        if (!topBlockCheck) {
-            const ir = new IntermediateRepresentation();
-            ir.entry = new IntermediateScript();
-            ir.procedures = {};
-            return ir;
-        }
-
         const entry = this.generateScriptTree(new ScriptTreeGenerator(this.thread), this.thread.topBlock);
 
         // Compile any required procedures.
@@ -2580,9 +2563,6 @@ class IRGenerator {
             this.proceduresToCompile = new Map();
 
             for (const [procedureVariant, definitionId] of this.compilingProcedures.entries()) {
-                if (!definitionId) {
-                    continue;
-                }
                 if (procedureTreeCache[procedureVariant]) {
                     const result = procedureTreeCache[procedureVariant];
                     this.procedures[procedureVariant] = result;
