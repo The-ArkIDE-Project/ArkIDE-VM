@@ -1465,6 +1465,7 @@ class Runtime extends EventEmitter {
         }
 
         this.emit(Runtime.EXTENSION_ADDED, categoryInfo);
+        this._scriptCache.clear();
     }
 
     /**
@@ -1479,6 +1480,7 @@ class Runtime extends EventEmitter {
             this._fillExtensionCategory(categoryInfo, extensionInfo);
 
             this.emit(Runtime.BLOCKSINFO_UPDATE, categoryInfo);
+            this._scriptCache.clear();
         }
     }
 
