@@ -2551,6 +2551,22 @@ class IRGenerator {
      * @returns {IntermediateRepresentation} Intermediate representation.
      */
     generate () {
+        if (!this.thread.topBlock) {
+            const ir = new IntermediateRepresentation();
+            ir.entry = new IntermediateScript();
+            ir.procedures = {};
+            return ir;
+        }
+
+        const topBlockCheck = this.blocks.getBlock(this.thread.topBlock) || 
+                            this.blocks.runtime.flyoutBlocks.getBlock(this.thread.topBlock);
+        if (!topBlockCheck) {
+            const ir = new IntermediateRepresentation();
+            ir.entry = new IntermediateScript();
+            ir.procedures = {};
+            return ir;
+        }
+
         const entry = this.generateScriptTree(new ScriptTreeGenerator(this.thread), this.thread.topBlock);
 
         // Compile any required procedures.
@@ -2562,7 +2578,6 @@ class IRGenerator {
 
             for (const [procedureVariant, definitionId] of this.compilingProcedures.entries()) {
                 if (!definitionId) {
-                    log.warn(`IR: skipping procedure with no definition: ${procedureVariant}`);
                     continue;
                 }
                 if (procedureTreeCache[procedureVariant]) {
