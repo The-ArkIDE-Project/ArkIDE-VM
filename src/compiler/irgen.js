@@ -2429,7 +2429,10 @@ class ScriptTreeGenerator {
                 // Empty procedure
                 return this.script;
             }
-            throw new Error('Cannot find top block');
+            // Instead of throwing, return an empty script so the thread
+            // gets silently dropped rather than spamming errors
+            log.warn(`IR: Cannot find top block "${topBlockId}" on target "${this.target.getName()}", skipping`);
+            return this.script;
         }
 
         if (topBlock.comment) {
