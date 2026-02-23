@@ -2426,9 +2426,9 @@ class ScriptTreeGenerator {
         const topBlock = this.getBlockById(topBlockId);
         if (!topBlock) {
             if (this.script.isProcedure) {
-                // Empty procedure
                 return this.script;
             }
+            log.warn(`IR: Cannot find top block. ID: "${topBlockId}", target: "${this.target.getName()}", all scripts:`, this.blocks._scripts);
             throw new Error('Cannot find top block');
         }
 
@@ -2436,14 +2436,11 @@ class ScriptTreeGenerator {
             this.readTopBlockComment(topBlock.comment);
         }
 
-        // We do need to evaluate empty hats
         const hatInfo = this.runtime._hats[topBlock.opcode];
         const isHat = !!hatInfo;
         if (isHat) {
             this.script.stack = this.walkHat(topBlock);
         } else {
-            // We don't evaluate the procedures_definition top block as it never does anything
-            // We also don't want it to be treated like a hat block
             let entryBlock;
             if (
                 topBlock.opcode === 'procedures_definition'
@@ -2504,6 +2501,10 @@ class IRGenerator {
             }
             const procedureCode = parseProcedureCode(procedureVariant);
             const definition = this.blocks.getProcedureDefinition(procedureCode);
+            if (!definition) {
+                log.warn(`IR: cannot find definition for procedure: ${procedureCode}`);
+                continue;
+            }
             this.proceduresToCompile.set(procedureVariant, definition);
         }
     }
@@ -2561,6 +2562,10 @@ class IRGenerator {
             this.proceduresToCompile = new Map();
 
             for (const [procedureVariant, definitionId] of this.compilingProcedures.entries()) {
+                if (!definitionId) {
+                    log.warn(`IR: skipping procedure with no definition: ${procedureVariant}`);
+                    continue;
+                }
                 if (procedureTreeCache[procedureVariant]) {
                     const result = procedureTreeCache[procedureVariant];
                     this.procedures[procedureVariant] = result;
